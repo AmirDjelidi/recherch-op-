@@ -22,10 +22,10 @@ def coin_nord_ouest(offre, demande):
         if demande[j] == 0:
             j += 1
 
+    cout_total = sum(costs[i][j] * solution[i][j] for i in range(rows) for j in range(cols))
 
 
-
-    return solution
+    return solution, cout_total
 
 def lire_fichier_complet(nom_fichier):
     try:
@@ -69,8 +69,9 @@ costs = [[30, 20, 20],[10, 50, 20],[50, 40, 30]]
 offre = [450, 600, 350]
 demande = [500, 600, 300]
 '''
-solution = coin_nord_ouest(offres, demandes)
+solution, cout_total = coin_nord_ouest(offres, demandes)
 
 print("Solution initiale:")
 for row in solution:
     print(row)
+print("Coût total:", cout_total)
