@@ -1,4 +1,4 @@
-def coin_nord_ouest(offre, demande):
+def coin_nord_ouest(costs,offre, demande):
 
 
     solution = [[0] * len(demande) for _ in range(len(offre))]
@@ -22,7 +22,7 @@ def coin_nord_ouest(offre, demande):
         if demande[j] == 0:
             j += 1
 
-    cout_total = sum(costs[i][j] * solution[i][j] for i in range(rows) for j in range(cols))
+    cout_total = sum(costs[i][j] * solution[i][j] for i in range(len(offre)) for j in range(len(demande)))
 
 
     return solution, cout_total
@@ -32,8 +32,10 @@ def lire_fichier_complet(nom_fichier):
         with open(nom_fichier, 'r') as fichier:
             lignes = fichier.readlines()
 
-        # Première ligne pour les dimensions, pas nécessaire pour le parsing puisque le fichier contient directement les données
-        nb_lignes = int(lignes[0].split()[1])
+        dimensions = lignes[0].split()
+        nb_lignes = int(dimensions[0])
+        nb_colonnes = int(dimensions[1])
+
 
         matrice_couts = []
         offres = []
@@ -56,12 +58,38 @@ def lire_fichier_complet(nom_fichier):
         print(f"Une erreur est survenue: {e}")
         return None, None, None
 
-# Exemple d'utilisation
+def calculer_penalites(couts):
+    n = len(couts)
+    m = len(couts[0])
+    penalites_lignes = []
+    penalites_colonnes = []
+
+    # Calcul des pénalités pour les lignes
+    for i in range(n):
+        ligne_sorted = sorted(couts[i])
+        penalite = ligne_sorted[1] - ligne_sorted[0] if len(ligne_sorted) > 1 else 0
+        penalites_lignes.append(penalite)
+
+    # Calcul des pénalités pour les colonnes
+    for j in range(m):
+        colonne = [couts[i][j] for i in range(n)]
+        colonne_sorted = sorted(colonne)
+        penalite = colonne_sorted[1] - colonne_sorted[0] if len(colonne_sorted) > 1 else 0
+        penalites_colonnes.append(penalite)
+
+    return penalites_lignes, penalites_colonnes
+
 matrice_couts, offres, demandes = lire_fichier_complet('problems/probleme 13.txt')
+penalite_ligne, penalite_colonne = calculer_penalites(matrice_couts)
 if matrice_couts is not None:
     print("Matrice des coûts:", matrice_couts)
     print("Offres:", offres)
     print("Demandes:", demandes)
+    print("Penalite ligne:", penalite_ligne)
+    print("Penalite colonne:", penalite_colonne)
+
+solution, cout_total = coin_nord_ouest(matrice_couts,offres, demandes)
+
 
 
 '''
@@ -69,7 +97,6 @@ costs = [[30, 20, 20],[10, 50, 20],[50, 40, 30]]
 offre = [450, 600, 350]
 demande = [500, 600, 300]
 '''
-solution, cout_total = coin_nord_ouest(offres, demandes)
 
 print("Solution initiale:")
 for row in solution:
