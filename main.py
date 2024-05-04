@@ -1,3 +1,4 @@
+import time
 def coin_nord_ouest(costs,offre, demande):
 
 
@@ -58,7 +59,71 @@ def lire_fichier_complet(nom_fichier):
         print(f"Une erreur est survenue: {e}")
         return None, None, None
 
-def calculer_penalites(couts):
+
+def trouver_meilleure_arrete(penalites_lignes, penalites_colonnes):
+    max_penalite_ligne = max(penalites_lignes)
+    max_penalite_colonne = max(penalites_colonnes)
+
+    # Collecter tous les indices avec la pénalité maximale pour les lignes et les colonnes
+    indices_max_lignes = [i for i, val in enumerate(penalites_lignes) if val == max_penalite_ligne]
+    indices_max_colonnes = [j for j, val in enumerate(penalites_colonnes) if val == max_penalite_colonne]
+
+    # Décider sur la base de la stratégie choisie
+    if max_penalite_ligne > max_penalite_colonne:
+        return ('ligne', indices_max_lignes[0], max_penalite_ligne)
+    elif max_penalite_colonne > max_penalite_ligne:
+        return ('colonne', indices_max_colonnes[0], max_penalite_colonne)
+    else:
+        # En cas d'égalité, choisir la ligne ou la colonne selon un critère (ici premier trouvé, premier choisi)
+        # Si vous voulez choisir de façon aléatoire ou selon un autre critère, c'est ici que vous le feriez
+        if indices_max_lignes[0] < indices_max_colonnes[0]:
+            return ('ligne', indices_max_lignes[0], max_penalite_ligne)
+        else:
+            return ('colonne', indices_max_colonnes[0], max_penalite_colonne)
+
+def reallocation_selon_arete(solution_initiale, couts, offre, demande, arrete, index):
+    n = len(couts)
+    m = len(couts[0])
+
+    if arrete == 'ligne':
+        ligne = index
+        # Récupérer la liste des coûts non utilisés
+        non_used_costs = [(couts[ligne][j], j) for j in range(m) if solution_initiale[ligne][j] == 0]
+
+        if non_used_costs:  # Vérifier si la liste est non vide
+            min_cout_col = min(non_used_costs)
+            col_to_increase = min_cout_col[1]
+
+            # Trouver l'index de la colonne pour réduire la quantité dans la même ligne
+            max_cout_col = max((couts[ligne][j], j) for j in range(m) if solution_initiale[ligne][j] > 0)
+            col_to_decrease = max_cout_col[1]
+
+            # Réallocation
+            quantite_a_reallouer = min(offre[ligne], demande[col_to_increase], solution_initiale[ligne][col_to_decrease])
+            solution_initiale[ligne][col_to_increase] += quantite_a_reallouer
+            solution_initiale[ligne][col_to_decrease] -= quantite_a_reallouer
+
+    elif arrete == 'colonne':
+        colonne = index
+        # Récupérer la liste des coûts non utilisés
+        non_used_costs = [(couts[i][colonne], i) for i in range(n) if solution_initiale[i][colonne] == 0]
+
+        if non_used_costs:  # Vérifier si la liste est non vide
+            min_cout_row = min(non_used_costs)
+            row_to_increase = min_cout_row[1]
+
+            # Trouver l'index de la ligne pour réduire la quantité dans la même colonne
+            max_cout_row = max((couts[i][colonne], i) for i in range(n) if solution_initiale[i][colonne] > 0)
+            row_to_decrease = max_cout_row[1]
+
+            # Réallocation
+            quantite_a_reallouer = min(demande[colonne], offre[row_to_increase], solution_initiale[row_to_decrease][colonne])
+            solution_initiale[row_to_increase][colonne] += quantite_a_reallouer
+            solution_initiale[row_to_decrease][colonne] -= quantite_a_reallouer
+
+    return solution_initiale
+
+def calculer_penalites(couts, solution_initiale):
     n = len(couts)
     m = len(couts[0])
     penalites_lignes = []
@@ -66,39 +131,92 @@ def calculer_penalites(couts):
 
     # Calcul des pénalités pour les lignes
     for i in range(n):
-        ligne_sorted = sorted(couts[i])
-        penalite = ligne_sorted[1] - ligne_sorted[0] if len(ligne_sorted) > 1 else 0
-        penalites_lignes.append(penalite)
+        ligne_couts = [(couts[i][j], solution_initiale[i][j]) for j in range(m)]
+        # Filtrer pour obtenir seulement les coûts où il y a des allocations
+        ligne_couts = [cout for cout, quantite in ligne_couts if quantite > 0]
+        if len(ligne_couts) > 1:
+            sorted_couts = sorted(ligne_couts)
+            penalite = sorted_couts[1] - sorted_couts[0]
+            penalites_lignes.append(penalite)
+        else:
+            penalites_lignes.append(0)  # Pas de pénalité si une seule allocation ou aucune
 
     # Calcul des pénalités pour les colonnes
     for j in range(m):
-        colonne = [couts[i][j] for i in range(n)]
-        colonne_sorted = sorted(colonne)
-        penalite = colonne_sorted[1] - colonne_sorted[0] if len(colonne_sorted) > 1 else 0
-        penalites_colonnes.append(penalite)
+        colonne_couts = [(couts[i][j], solution_initiale[i][j]) for i in range(n)]
+        # Filtrer pour obtenir seulement les coûts où il y a des allocations
+        colonne_couts = [cout for cout, quantite in colonne_couts if quantite > 0]
+        if len(colonne_couts) > 1:
+            sorted_couts = sorted(colonne_couts)
+            penalite = sorted_couts[1] - sorted_couts[0]
+            penalites_colonnes.append(penalite)
+        else:
+            penalites_colonnes.append(0)  # Pas de pénalité si une seule allocation ou aucune
 
     return penalites_lignes, penalites_colonnes
+def solution_initiale_moindre_cout(couts, offre, demande):
+    n = len(offre)
+    m = len(demande)
+    solution = [[0] * m for _ in range(n)]
 
-matrice_couts, offres, demandes = lire_fichier_complet('problems/probleme 13.txt')
-penalite_ligne, penalite_colonne = calculer_penalites(matrice_couts)
+    # Créer une liste des coûts avec leurs indices pour faciliter le tri et l'allocation
+    couts_indices = [(couts[i][j], i, j) for i in range(n) for j in range(m)]
+    couts_indices.sort()  # Trier par coût
+
+    for cout, i, j in couts_indices:
+        if offre[i] > 0 and demande[j] > 0:
+            quantite_allouee = min(offre[i], demande[j])
+            solution[i][j] = quantite_allouee
+            offre[i] -= quantite_allouee
+            demande[j] -= quantite_allouee
+
+    return solution
+
+def calculer_cout_total(couts, solution):
+    n = len(couts)
+    m = len(couts[0])
+    cout_total = 0
+    for i in range(n):
+        for j in range(m):
+            cout_total += solution[i][j] * couts[i][j]
+    return cout_total
+def balas_hammer(couts, offre, demande):
+    solution_initiale = solution_initiale_moindre_cout(couts, offre.copy(), demande.copy())
+    cout_total_precedent = calculer_cout_total(couts, solution_initiale)
+    cpt = 0
+    while True:
+        penalites_lignes, penalites_colonnes = calculer_penalites(couts, solution_initiale)
+
+        arrete, index, penalite = trouver_meilleure_arrete(penalites_lignes, penalites_colonnes)
+
+        if penalite == 0:
+            break  # Aucune amélioration possible
+        cout_total_actuel = calculer_cout_total(couts, solution_initiale)
+        if cout_total_actuel == cout_total_precedent:
+            break  # Arrêter si le coût total n'a pas diminué
+        solution_initiale = reallocation_selon_arete(solution_initiale, couts, offre, demande, arrete, index)
+        print(solution_initiale)
+
+
+        cout_total_precedent = cout_total_actuel
+
+
+    return solution_initiale, cout_total_actuel
+
+matrice_couts, offres, demandes = lire_fichier_complet('problems/probleme 14.txt')
+
 if matrice_couts is not None:
     print("Matrice des coûts:", matrice_couts)
     print("Offres:", offres)
     print("Demandes:", demandes)
-    print("Penalite ligne:", penalite_ligne)
-    print("Penalite colonne:", penalite_colonne)
-
-solution, cout_total = coin_nord_ouest(matrice_couts,offres, demandes)
-
-
-
-'''
-costs = [[30, 20, 20],[10, 50, 20],[50, 40, 30]]
-offre = [450, 600, 350]
-demande = [500, 600, 300]
-'''
-
-print("Solution initiale:")
-for row in solution:
-    print(row)
-print("Coût total:", cout_total)
+    """solution, cout_total = coin_nord_ouest(matrice_couts, offres, demandes)
+    print("Solution initiale après Nord-Ouest:")
+    for row in solution:
+        print(row)"""
+    
+    solution1, cout_total = balas_hammer(matrice_couts, offres, demandes)
+    print("Solution initiale après Balas-Hammer:")
+    print(solution1)
+    for ligne in solution1:
+        print(ligne)
+    print("Coût total:", cout_total)
